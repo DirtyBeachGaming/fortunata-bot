@@ -1,0 +1,18 @@
+# Core bot framework
+discord.py==2.6.4
+
+# Config loading
+python-dotenv>=1.0.1,<2.0.0
+
+# Database
+aiosqlite>=0.20.0,<0.21.0
+
+# Full natal chart calculation (Swiss Ephemeris under the hood)
+kerykeion==5.12.9
+
+# Geocoding (birth city -> lat/lon) + timezone resolution (lat/lon -> tz)
+geopy==2.4.1
+timezonefinder>=6.5.0,<7.0.0
+
+# Chinese lunar calendar (accurate Lunar New Year cutoff for Chinese zodiac)
+LunarCalendar>=0.0.9,<0.1.0
