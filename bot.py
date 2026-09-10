@@ -51,14 +51,27 @@ class Fortunata(commands.Bot):
             except Exception:
                 log.exception("Failed to load extension %s", ext)
 
-        if config.GUILD_ID:
-            guild_obj = discord.Object(id=config.GUILD_ID)
-            self.tree.copy_global_to(guild=guild_obj)
-            synced = await self.tree.sync(guild=guild_obj)
-            log.info("Synced %d command(s) to guild %s (instant)", len(synced), config.GUILD_ID)
-        else:
-            synced = await self.tree.sync()
-            log.info("Synced %d command(s) globally (may take up to ~1h to appear)", len(synced))
+        try:
+            if config.GUILD_ID:
+                guild_obj = discord.Object(id=config.GUILD_ID)
+                self.tree.copy_global_to(guild=guild_obj)
+                synced = await self.tree.sync(guild=guild_obj)
+                log.info("Synced %d command(s) to guild %s (instant)", len(synced), config.GUILD_ID)
+            else:
+                synced = await self.tree.sync()
+                log.info("Synced %d command(s) globally (may take up to ~1h to appear)", len(synced))
+        except discord.Forbidden:
+            log.error(
+                "Couldn't sync slash commands to guild %s — Discord says I don't have "
+                "access to that server. This means either the bot hasn't actually been "
+                "invited to it, GUILD_ID doesn't match the server it WAS invited to, or "
+                "it was invited without the 'applications.commands' scope. The bot will "
+                "still start up — fix the invite/GUILD_ID and restart to get commands "
+                "registered.",
+                config.GUILD_ID,
+            )
+        except discord.HTTPException:
+            log.exception("Command sync failed")
 
     async def close(self) -> None:
         await self.db.close()
