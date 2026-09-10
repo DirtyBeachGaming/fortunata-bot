@@ -173,6 +173,56 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
+    # ------------------------------------------------------ backfill-unverified
+
+    @fortunata.command(
+        name="backfill-unverified",
+        description="Give the Unverified role to every existing member who isn't Verified yet (for members who joined before setup).",
+    )
+    async def backfill_unverified_cmd(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        assert guild is not None
+        config = await self.db.get_guild_config(guild.id)
+        if not config or not config.get("unverified_role_id") or not config.get("verified_role_id"):
+            await interaction.response.send_message(
+                "Run `/fortunata setup` first.", ephemeral=True
+            )
+            return
+
+        unverified_role = guild.get_role(config["unverified_role_id"])
+        verified_role = guild.get_role(config["verified_role_id"])
+        if unverified_role is None or verified_role is None:
+            await interaction.response.send_message(
+                "Couldn't find the configured roles — re-run `/fortunata setup`.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        updated, skipped, failed = 0, 0, 0
+        async for member in guild.fetch_members(limit=None):
+            if member.bot:
+                continue
+            if verified_role in member.roles or unverified_role in member.roles:
+                skipped += 1
+                continue
+            try:
+                await member.add_roles(
+                    unverified_role, reason="Fortunata backfill: existing member pending verification"
+                )
+                updated += 1
+            except discord.HTTPException:
+                failed += 1
+
+        await interaction.followup.send(
+            f"✅ Gave Unverified to {updated} existing member(s). "
+            f"Skipped {skipped} (already Verified/Unverified)"
+            + (f", {failed} failed" if failed else "")
+            + ".",
+            ephemeral=True,
+        )
+
     # ------------------------------------------------------ create-roles
 
     @fortunata.command(
