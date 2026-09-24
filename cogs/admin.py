@@ -177,7 +177,7 @@ class Admin(commands.Cog):
 
     @fortunata.command(
         name="backfill-unverified",
-        description="Give the Unverified role to every existing member who isn't Verified yet (for members who joined before setup).",
+        description="Give existing (pre-setup) members the Unverified role if they aren't Verified yet.",
     )
     async def backfill_unverified_cmd(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
