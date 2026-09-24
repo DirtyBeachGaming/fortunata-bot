@@ -30,6 +30,7 @@ EXTENSIONS = [
     "cogs.chinese_zodiac",
     "cogs.blood_type",
     "cogs.profile",
+    "cogs.compatibility",
     "cogs.admin",
 ]
 
