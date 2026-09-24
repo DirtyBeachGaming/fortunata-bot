@@ -1,8 +1,13 @@
 """
-/compatibility — a running gag, not a real astrology feature. Whoever you
-check against, the punchline is always the same: your true match was
-Trimalchio all along, and Trimalchio's own true match is a running joke
-of its own.
+/compatibility — mostly a running gag, but dressed up as a real reading.
+
+It actually reasons through elemental and modality compatibility using
+each person's Sun sign (when they have one on file) before landing on the
+same punchline every time: your true match was Trimalchio all along.
+
+Two accounts are hardcoded as the one true exception — whichever order
+they check each other in, they're simply told they're soulmates, no
+mechanics, no joke.
 """
 from __future__ import annotations
 
@@ -12,9 +17,67 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.astrology import get_sign
+from utils.astrology import get_sign, ZodiacSign
 
-# Flavor text varies each time; the two "facts" below never do.
+# The one real pairing. Checking compatibility between these two (in either
+# direction) skips the joke machinery entirely.
+SOULMATE_PAIR = {1439520700690862102, 1250948992582553661}
+
+# Traditional elemental compatibility, keyed by the unordered pair of
+# elements. (description, (low, high) percentage range)
+ELEMENT_COMPAT: dict[frozenset, tuple[str, tuple[int, int]]] = {
+    frozenset({"Fire"}): (
+        "Two Fire signs recognize the spark in each other instantly — thrilling, "
+        "but two flames sharing one hearth tend to argue about whose fire burns brighter.",
+        (45, 75),
+    ),
+    frozenset({"Fire", "Air"}): (
+        "Air feeds Fire. This is one of the classic easy pairings — one brings the "
+        "spark, the other brings the oxygen, and neither has to try very hard.",
+        (60, 92),
+    ),
+    frozenset({"Fire", "Earth"}): (
+        "Fire scorches Earth, and Earth smothers Fire. Workable with patience, but the "
+        "natural instinct of each sign undoes what the other is trying to build.",
+        (15, 42),
+    ),
+    frozenset({"Fire", "Water"}): (
+        "Fire meets Water and one of them loses. Sometimes that reads as passion, "
+        "sometimes as steam evaporating before anything can settle.",
+        (18, 48),
+    ),
+    frozenset({"Earth"}): (
+        "Two Earth signs build something that lasts — dependable, a little "
+        "predictable, and neither one in a hurry to shake things up.",
+        (48, 74),
+    ),
+    frozenset({"Earth", "Water"}): (
+        "Water nourishes Earth. This is the other classic easy pairing — one gives "
+        "shape, the other gives depth, and both come away better for it.",
+        (58, 90),
+    ),
+    frozenset({"Earth", "Air"}): (
+        "Air has no interest in staying still long enough for Earth to take root. "
+        "Great conversation, very little follow-through.",
+        (20, 45),
+    ),
+    frozenset({"Air"}): (
+        "Two Air signs talk endlessly and understand each other perfectly — right up "
+        "until someone has to actually commit to something.",
+        (50, 78),
+    ),
+    frozenset({"Air", "Water"}): (
+        "Air unsettles Water's stillness, and Water's moods are, frankly, too much "
+        "weather for Air to plan around.",
+        (20, 48),
+    ),
+    frozenset({"Water"}): (
+        "Two Water signs recognize the tide in each other — deeply intuitive, deeply "
+        "felt, and occasionally a lot to hold at once.",
+        (52, 80),
+    ),
+}
+
 TWIST_LINES = [
     "But halfway through the second course, the truth becomes impossible to ignore.",
     "And yet, as the wine keeps coming, something else becomes clear.",
@@ -27,6 +90,18 @@ CLOSING_LINE = (
     "🍷 For the record: Trimalchio himself is most compatible with "
     "*uxor Trimalchionis*, Gwendalini."
 )
+
+
+def _quality_note(sign_a: ZodiacSign, sign_b: ZodiacSign) -> str:
+    if sign_a.quality == sign_b.quality:
+        return (
+            f"Both {sign_a.quality.lower()} signs — which means neither one is "
+            f"built to back down first."
+        )
+    return (
+        f"A {sign_a.quality} sign meeting a {sign_b.quality} one — different "
+        f"instincts for who leads, who holds steady, and who goes along with it."
+    )
 
 
 class Compatibility(commands.Cog):
@@ -49,25 +124,51 @@ class Compatibility(commands.Cog):
             )
             return
 
+        # The one real exception, either direction.
+        if {asker.id, member.id} == SOULMATE_PAIR:
+            embed = discord.Embed(
+                title="💞 Destiny, Not Chance",
+                description=(
+                    f"{asker.mention} and {member.mention} — there's no reading to "
+                    f"give here, no elements to weigh against each other. This one "
+                    f"was written into the fresco before either of you arrived.\n\n"
+                    f"**💯% — soul mates.**"
+                ),
+                color=0xE8A0C4,
+            )
+            embed.set_footer(text="🍇 Trimalchio's Dinner Party")
+            await interaction.response.send_message(embed=embed)
+            return
+
         asker_data = await self.db.get_user(guild.id, asker.id) or {}
         target_data = await self.db.get_user(guild.id, member.id) or {}
         asker_sign = get_sign(asker_data.get("sun_sign")) if asker_data.get("sun_sign") else None
         target_sign = get_sign(target_data.get("sun_sign")) if target_data.get("sun_sign") else None
 
-        score = random.randint(4, 61)
-
         if asker_sign and target_sign:
-            reading_line = (
-                f"{asker_sign.symbol} {asker_sign.name} and {target_sign.symbol} {target_sign.name} "
-                f"— **{score}%** compatible."
+            key = frozenset({asker_sign.element, target_sign.element})
+            element_desc, score_range = ELEMENT_COMPAT[key]
+            score = random.randint(*score_range)
+            reading = (
+                f"{asker_sign.symbol} **{asker_sign.name}** ({asker_sign.element}) meets "
+                f"{target_sign.symbol} **{target_sign.name}** ({target_sign.element}).\n\n"
+                f"{element_desc}\n\n"
+                f"{_quality_note(asker_sign, target_sign)}\n\n"
+                f"**Compatibility: {score}%**"
             )
         else:
-            reading_line = f"You and {member.mention} — **{score}%** compatible."
+            score = random.randint(4, 61)
+            missing = asker.mention if not asker_sign else member.mention
+            reading = (
+                f"You and {member.mention} — **{score}%** compatible.\n\n"
+                f"*(The reading would run deeper if {missing} had claimed a Sun sign — "
+                f"try `/placements` or the verification panel.)*"
+            )
 
         twist = random.choice(TWIST_LINES)
 
         description = (
-            f"{reading_line}\n\n"
+            f"{reading}\n\n"
             f"{twist} Your true match was here all along.\n\n"
             f"**{asker.mention} + Trimalchio: 💯% compatible.**\n\n"
             f"{CLOSING_LINE}"
