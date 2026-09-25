@@ -125,6 +125,7 @@ Once the bot is online and invited:
 | `/chinesezodiac` | anyone | Chinese zodiac animal + Five Element, from birth date |
 | `/bloodtype` | anyone | Blood type astrology, pick from a dropdown |
 | `/profile [member]` | anyone | Summary card of everything on file for a member |
+| `/compatibility member:@user [as_member:@user]` | anyone | Joke compatibility reading (blends Sun sign, Chinese zodiac, and blood type — whichever either person has on file). Omit `as_member` to check yourself against `member`; set it to check two *other* members against each other instead. The punchline is always Trimalchio. |
 | `/fortunata setup` | Manage Server | Post/move the verification panel |
 | `/fortunata lockdown` | Manage Server | Hide non-verification channels from unverified members |
 | `/fortunata create-roles` | Manage Server | Pre-create every role the bot uses |
