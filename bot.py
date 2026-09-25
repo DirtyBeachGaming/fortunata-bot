@@ -31,6 +31,7 @@ EXTENSIONS = [
     "cogs.blood_type",
     "cogs.profile",
     "cogs.compatibility",
+    "cogs.synastry",
     "cogs.admin",
 ]
 
