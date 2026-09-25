@@ -124,14 +124,22 @@ class Compatibility(commands.Cog):
             )
             return
 
-        # The one real exception, either direction.
+        # The one real exception, either direction. Always names them the
+        # same way — Trimalchio first, Gwendalini second — no matter who
+        # actually ran the command or who they picked as `member`.
         if {asker.id, member.id} == SOULMATE_PAIR:
+            people = {asker.id: asker, member.id: member}
+            trimalchio_user = people[1439520700690862102]
+            gwendalini_user = people[1250948992582553661]
+
             embed = discord.Embed(
                 title="💞 Destiny, Not Chance",
                 description=(
-                    f"{asker.mention} and {member.mention} — there's no reading to "
-                    f"give here, no elements to weigh against each other. This one "
-                    f"was written into the fresco before either of you arrived.\n\n"
+                    f"{trimalchio_user.mention} (Trimalchio) and "
+                    f"{gwendalini_user.mention} (Gwendalini) — there's no reading "
+                    f"to give here, no elements to weigh against each other. This "
+                    f"one was written into the fresco before either of you "
+                    f"arrived.\n\n"
                     f"**💯% — soul mates.**"
                 ),
                 color=0xE8A0C4,
