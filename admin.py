@@ -323,6 +323,72 @@ class Admin(commands.Cog):
 
         await interaction.followup.send("\n".join(lines), ephemeral=True)
 
+    # ------------------------------------------------------ restore-from-roles
+
+    @fortunata.command(
+        name="restore-from-roles",
+        description="One-time repair: rebuild lost astrology data by reading members' existing roles.",
+    )
+    async def restore_from_roles_cmd(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        assert guild is not None
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        # role name -> (db column, value to store)
+        role_map: dict[str, tuple[str, str]] = {}
+        for key in SIGN_ORDER:
+            sign = ZODIAC_SIGNS[key]
+            for attr, _label, _emoji in PLANETS:
+                role_map[role_utils.planet_role_name(attr, sign)] = (f"{attr}_sign", sign.key)
+            role_map[role_utils.planet_role_name("ascendant", sign)] = ("ascendant_sign", sign.key)
+        for animal in ANIMALS:
+            role_map[role_utils.chinese_animal_role_name(animal)] = ("chinese_animal", animal)
+        for element in ELEMENTS:
+            role_map[role_utils.chinese_element_role_name(element)] = ("chinese_element", element)
+        for blood in BLOOD_TYPES.values():
+            role_map[role_utils.blood_role_name(blood)] = ("blood_type", blood.key)
+
+        guild_cfg = await self.db.get_guild_config(guild.id) or {}
+        verified_role_id = guild_cfg.get("verified_role_id")
+
+        restored, untouched, failed = 0, 0, 0
+        async for member in guild.fetch_members(limit=None):
+            if member.bot:
+                continue
+
+            fields: dict = {}
+            for role in member.roles:
+                hit = role_map.get(role.name)
+                if hit:
+                    column, value = hit
+                    fields[column] = value
+
+            if not fields:
+                untouched += 1
+                continue
+
+            if verified_role_id and any(r.id == verified_role_id for r in member.roles):
+                fields["verified"] = 1
+
+            try:
+                await self.db.upsert_user(guild.id, member.id, **fields)
+                restored += 1
+            except Exception:
+                log.exception("Failed to restore data for %s from their roles", member)
+                failed += 1
+
+        await interaction.followup.send(
+            f"✅ Rebuilt data for {restored} member(s) from their existing roles. "
+            f"{untouched} member(s) had no matching Fortunata roles"
+            + (f", {failed} failed" if failed else "")
+            + ".\n\n"
+            "⚠️ This only recovers sign-level data (Sun through Pluto, Rising, Chinese "
+            "zodiac animal/element, blood type) — exact birth date/time/location can't "
+            "be read back from a role name, so `/synastry` won't work for restored "
+            "members until they re-run `/placements`.",
+            ephemeral=True,
+        )
+
     # --------------------------------------------------------------- misc
 
     @fortunata.command(name="config", description="Show Fortunata's current configuration for this server.")
