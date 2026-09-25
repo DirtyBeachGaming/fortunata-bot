@@ -138,6 +138,13 @@ class Database:
         row = await cur.fetchone()
         return dict(row) if row else None
 
+    async def count_users(self, guild_id: int) -> int:
+        cur = await self.conn.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE guild_id = ?", (guild_id,)
+        )
+        row = await cur.fetchone()
+        return int(row["n"]) if row else 0
+
     async def upsert_user(self, guild_id: int, user_id: int, **fields: Any) -> None:
         bad = set(fields) - _USER_COLUMNS
         if bad:
