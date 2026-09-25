@@ -23,6 +23,12 @@ below), with its own SQLite database.
   its own role.
 - **`/profile`** — a shareable card summarizing everything Fortunata knows
   about you (or another member).
+- **`/synastry`** — a real, non-joke compatibility reading. Recalculates
+  exact chart degrees from each member's saved `/placements` birth data
+  and checks the ten Sun/Moon/Venus/Mars/Ascendant cross-pairings
+  astrologers actually use for relationship compatibility, looking for
+  real aspects (conjunction, sextile, square, trine, opposition) and
+  blending them into one deterministic score.
 - **`/fortunata ...`** — admin commands to set up the verification panel,
   lock down the rest of the server from unverified members, bulk-create
   every role in advance, view config, and reset a member's data.
@@ -126,6 +132,7 @@ Once the bot is online and invited:
 | `/bloodtype` | anyone | Blood type astrology, pick from a dropdown |
 | `/profile [member]` | anyone | Summary card of everything on file for a member |
 | `/compatibility member:@user [as_member:@user]` | anyone | Joke compatibility reading (blends Sun sign, Chinese zodiac, and blood type — whichever either person has on file). Omit `as_member` to check yourself against `member`; set it to check two *other* members against each other instead. The punchline is always Trimalchio. |
+| `/synastry member:@user [as_member:@user]` | anyone | Real, non-joke chart-based compatibility using exact degrees and actual astrological aspects. Both members need `/placements` on file first. |
 | `/fortunata setup` | Manage Server | Post/move the verification panel |
 | `/fortunata lockdown` | Manage Server | Hide non-verification channels from unverified members |
 | `/fortunata create-roles` | Manage Server | Pre-create every role the bot uses |
