@@ -149,6 +149,85 @@ def _compute_chart_blocking(
     return placements
 
 
+@dataclass
+class ExactPositions:
+    """Absolute zodiac-wheel degrees (0-360) for every tracked point, plus
+    the sign each one resolves to. Used for real aspect-based synastry,
+    where sign alone isn't precise enough."""
+    degrees: dict[str, float]     # key -> 0-360 absolute position
+    signs: dict[str, ZodiacSign]  # key -> ZodiacSign
+
+
+def _compute_exact_positions_blocking(
+    name: str,
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    lat: float,
+    lon: float,
+    tz_str: str,
+) -> ExactPositions:
+    from kerykeion import AstrologicalSubjectFactory
+
+    subject = AstrologicalSubjectFactory.from_birth_data(
+        name,
+        year, month, day, hour, minute,
+        lng=lon,
+        lat=lat,
+        tz_str=tz_str,
+        online=False,
+    )
+
+    degrees: dict[str, float] = {}
+    signs: dict[str, ZodiacSign] = {}
+    for attr, _label, _emoji in PLANETS:
+        point = getattr(subject, attr)
+        sign = sign_from_kerykeion_code(point.sign)
+        if sign is None:
+            raise ChartError(f"Unrecognized zodiac code for {attr}: {point.sign!r}")
+        degrees[attr] = float(point.abs_pos)
+        signs[attr] = sign
+
+    asc_point = subject.first_house
+    asc_sign = sign_from_kerykeion_code(asc_point.sign)
+    if asc_sign is None:
+        raise ChartError(f"Unrecognized zodiac code for ascendant: {asc_point.sign!r}")
+    degrees["ascendant"] = float(asc_point.abs_pos)
+    signs["ascendant"] = asc_sign
+
+    return ExactPositions(degrees=degrees, signs=signs)
+
+
+async def compute_exact_positions(
+    *,
+    name: str,
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    lat: float,
+    lon: float,
+    tz_str: str,
+) -> ExactPositions:
+    """Recompute a chart's exact degree positions from already-known birth
+    data (no geocoding needed — reuses the lat/lon/tz saved by /placements).
+    Raises ChartError on failure."""
+    try:
+        return await asyncio.to_thread(
+            _compute_exact_positions_blocking,
+            name, year, month, day, hour, minute, lat, lon, tz_str,
+        )
+    except ChartError:
+        raise
+    except Exception as exc:
+        raise ChartError(
+            "Couldn't recalculate that chart. Try running /placements again."
+        ) from exc
+
+
 async def compute_natal_chart(
     *,
     name: str,
