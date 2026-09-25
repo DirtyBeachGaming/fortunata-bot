@@ -4,11 +4,13 @@ Admin/setup commands, grouped under /fortunata. Requires Manage Server.
 from __future__ import annotations
 
 import logging
+import os
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+import config
 from utils import roles as role_utils
 from utils.astrology import ZODIAC_SIGNS, SIGN_ORDER
 from utils.chart import PLANETS
@@ -177,7 +179,7 @@ class Admin(commands.Cog):
 
     @fortunata.command(
         name="backfill-unverified",
-        description="Give the Unverified role to every existing member who isn't Verified yet (for members who joined before setup).",
+        description="Give existing (pre-setup) members the Unverified role if they aren't Verified yet.",
     )
     async def backfill_unverified_cmd(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
@@ -269,6 +271,57 @@ class Admin(commands.Cog):
             + (f", {failed} failed" if failed else "") + ".",
             ephemeral=True,
         )
+
+    # ------------------------------------------------------ diagnostics
+
+    @fortunata.command(
+        name="diagnostics",
+        description="Debug data-persistence issues: DB path, file size, row counts, and a member's stored row.",
+    )
+    @app_commands.describe(member="Whose stored row to show (defaults to you)")
+    async def diagnostics_cmd(
+        self, interaction: discord.Interaction, member: discord.Member | None = None
+    ) -> None:
+        guild = interaction.guild
+        assert guild is not None
+        target = member or interaction.user
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        db_path = config.DB_PATH
+        exists = os.path.exists(db_path)
+        size = os.path.getsize(db_path) if exists else 0
+        total_rows = await self.db.count_users(guild.id)
+        data = await self.db.get_user(guild.id, target.id)
+
+        lines = [
+            f"**DB_PATH (what the running bot sees):** `{db_path}`",
+            f"**File exists on disk:** {'✅' if exists else '❌ not created yet'}",
+            f"**File size:** {size:,} bytes",
+            f"**Rows stored for this server:** {total_rows}",
+            "",
+            f"**Stored row for {target.mention}:**",
+        ]
+        if data:
+            interesting = {k: v for k, v in data.items() if v not in (None, "") and k not in ("guild_id", "user_id")}
+            if interesting:
+                for key, value in interesting.items():
+                    lines.append(f"• `{key}` = `{value}`")
+            else:
+                lines.append("*(a row exists, but every column on it is empty)*")
+        else:
+            lines.append("*(no row at all for this member in this server)*")
+
+        lines.append(
+            "\n💡 **To test whether this survives a restart:** run this command again, "
+            "then restart the Railway service (or push any small change so it redeploys), "
+            "then run it a third time. If the row count or `DB_PATH` changes after that "
+            "restart, the SQLite file isn't on a persistent Railway Volume — double-check "
+            "Settings → Volumes shows a volume mounted at exactly the folder `DB_PATH` "
+            "points into (e.g. `DB_PATH=/data/fortunata.sqlite3` needs a volume mounted "
+            "at `/data`), and that the `DB_PATH` variable is spelled exactly right."
+        )
+
+        await interaction.followup.send("\n".join(lines), ephemeral=True)
 
     # --------------------------------------------------------------- misc
 
